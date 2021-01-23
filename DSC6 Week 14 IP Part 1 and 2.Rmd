@@ -1,0 +1,715 @@
+---
+title: "DSC week 14 IP part1 and with R"
+author: "william"
+date: "22/01/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Part 1: Dimensionality Reduction
+
+This section of the project entails reducing your dataset to a low dimensional dataset using the t-SNE algorithm or PCA. You will be required to perform your analysis and provide insights gained from your analysis.
+
+
+## Dimensionality Reduction
+
+### Principal Component Analysis (PCA)
+
+
+```{r}
+## 2.0 Importing packages
+#
+#importing libraries
+#
+#install.packages("caret")
+#loading the library
+library(data.table) # load package
+#install.packages(c("Rcpp","tidyverse")) # install packages to work with data frame - extends into visualization
+library(tidyverse)
+library("caret")
+```
+
+
+```{r}
+## dataset
+# Dataset Url = http://bit.ly/CarreFourDataset
+#
+#
+# Importing our dataset
+#
+sales_dataset <- read.csv('http://bit.ly/CarreFourDataset')
+
+# Previewing the dataset
+# ---
+#having a look at the dataset 
+head(sales_dataset,6)
+
+```
+
+## 3. previewing our dataset.
+```{r}
+#viewing the dataset
+#
+View(sales_dataset)
+#
+#checking the dataset dimension(displaying the number of rows and columns).
+dim(sales_dataset)
+```
+observation: the tables has 1000 records and 16 columns. this is a wide table and that is why dimensionality reduction is needed. 
+
+
+### checking the colunms summary
+```{r}
+# checking the content/summary statistics of each column.
+str(sales_dataset)
+```
+observation: the columns contains, character, numerical, and integer data type; in other words We have 8 numerical columns and 8 categorical columns in our dataset.
+
+
+```{r}
+### checking our dataset class
+class(sales_dataset)
+```
+this dataset is of the class data.frame.
+
+
+### converting the data into a tibble for easy manupulation
+```{r}
+#For ease in analysis,we convert the data into a tibble
+df_sales<-as_tibble(sales_dataset) # there is suggestion to use as_tibble instead of as.tibble.
+df_sales
+```
+
+###checking dataset summary
+```{r}
+### dataset summary 
+summary(df_sales)
+
+```
+observation: this gives us a preview of mean, median, maximum of the colunms.
+
+
+## Data cleaning
+
+###2.0 missing values
+```{r}
+# Identify missing data in our entire dataset using is.na() function
+#
+
+colSums(is.na(df_sales))
+```
+
+### Checking for missing values using the complete function
+```{r}
+
+# using complete function 
+
+df_sales[!complete.cases(df_sales),]
+```
+observation: there is no missing values. 
+
+
+### 3.0 Duplicated Data
+```{r}
+#Identifying Duplicated Data
+#
+duplicated_rows <- df_sales[duplicated(df_sales),]
+duplicated_rows
+```
+
+```{r}
+# checking for duplicated records
+anyDuplicated(df_sales)
+```
+observation: there is no duplicates in our dataset.
+
+### checking for outlier
+```{r}
+# install the package 
+#install.packages("ggstatsplot")
+# Load the package
+library(devtools)
+library(ggstatsplot)
+```
+
+###3.2a Identifying the numeric class in the data and evaluating if there are any outliers
+
+```{r}
+#Checking the data types of the columns
+#
+Numeric<- df_sales %>% select_if(is.numeric)
+Numeric
+
+```
+observation: we have 8 numerical variables.
+
+### visualizing outliers
+```{r}
+# Create a boxplot of the dataset, outliers are shown as two distinct points
+boxplot(Numeric)$out
+```
+observation: there is outliers in Tax,cogs,gross income, and Total variables. however they look genuine thus we will not remove them.
+
+
+
+
+## 4.0 Creating a dataset for PCA
+```{r}
+
+# Selecting the numerical data (excluding the categorical variables)
+# ---
+# 
+numeric <- df_sales[,c(6:8,12:16)]
+head(numeric)
+
+```
+
+observation: PCA only works with numerical values, thus we selected numerical variables from our dataset.
+
+
+## ### Ensuring our variances is not 0
+```{r}
+# Ensuring our variances is not 0, this replaces center argument.
+# 
+non_zero_var <- numeric[ , which(apply(numeric, 2, var) != 0)]
+head(non_zero_var)
+```
+observation, apply function is used instead of center to ensure there is no zero variance. this also helps in ensuring no column has zero mean. in this case one column "gross.margin.percentage" was removed. 
+
+
+
+
+```{r}
+#We then pass pca_numeric to the prcomp(). We also set one arguments, scale, 
+# to be TRUE then preview our object with summary
+pca_sales <- prcomp(non_zero_var,scale=TRUE)
+summary(pca_sales)
+```
+observation:
+
+we obtain 7 principal components, each which explain a percentage of the total variation of the Dataset.
+
+PC1 explains 70% of the total variance, which means that nearly two-thirds 
+of the information in the Dataset ( variables) can be encapsulated 
+by just that one Principal Component. PC2 explains 14% of the variance. PC3 explains 1.2% of the variance and so on.
+
+PC1 has 2.22 of  standard deviation, PC2 has 1.0 of  standard deviation, PC3 has 0.99 of  standard deviation etc.
+
+
+### we can plot the principal components for visualization using plot(), and type.
+
+```{r}
+plot(pca_sales,type = 'l')
+```
+Observation: Most of the variability in our data are in the first and second component of our PCa. Variance explained keeps on reducing as PC increases. 
+
+
+```{r}
+# Calling str() to have a look at your PCA object
+# ---
+# 
+str(pca_sales)
+```
+Observation: 
+Here we note that our pca object: The center point ($center presnted by apply()function), scaling ($scale),standard deviation(sdev) of each principal component for example standard deviation for pc1 is 2.22. 
+
+The relationship (correlation or anticorrelation, etc) between the initial variables and the principal components ($rotation) for example the correlation of pc1 is -0.292
+
+The values of each sample in terms of the principal components ($x) for example the value of pc1 is -2.005.
+
+
+
+## visualizing our PCA
+```{r}
+
+# we install packages to assist in visualization
+# 
+# Installing our ggbiplot visualization package
+# 
+#remotes::install_github('vqv/ggbiplot') ##There is no install_github function in base R, we use the remotes package.
+library(ggbiplot)
+
+```
+```{r}
+#installing devtools
+#install.packages('devtools')
+#
+library(devtools)
+
+```
+
+```{r}
+# Then Loading our libraries
+#  
+library(ggplot2)
+library(plyr)
+library(scales)
+library(grid)
+library(ggbiplot)
+library(tidyverse)
+```
+
+
+## plotting our pca
+```{r}
+# We will now plot our pca. This will provide us with some very useful insights i.e. 
+# which  are most similar to each other.
+ggbiplot(pca_sales, scale =0.4)
+```
+observation:
+
+From the graph above, it doesn't  help us group our data points based on principal components as the data points are scattered allover.
+
+
+## selecting PC1 and PC2,PC3 for ploting
+```{r}
+#we want to include other colunms to be plotted as well
+pca_sales1 <- cbind(df_sales,pca_sales$x[,1:3])
+head(pca_sales1)
+```
+
+## plotting PCa with added information.
+```{r}
+# Adding more detail to the plot, we provide arguments rownames as labels
+# 
+ggbiplot(pca_sales, col=Product.line(pca_sales1), obs.scale = 1, var.scale =1.5)
+
+```
+observation: still it doesn't  help us group our data points based on principal components as the data points are scattered allover.
+
+
+## plotting PC1 and PC2 to check the products by grouping based on gender.
+```{r}
+ggplot(pca_sales1,aes(PC1,PC2,PC3, col=Product.line,fill=Gender))+
+ stat_ellipse(geom = "polygon",col='green',alpha=1)+
+ geom_point(col='black',shape=21)
+```
+observation: customers overlap in so many area hence using principal component analysis to group them into different categories has failed.
+
+
+
+
+
+## part 2
+
+Part 2: Feature Selection
+
+This section requires you to perform feature selection through the use of the unsupervised learning methods learned earlier this week. You will be required to perform your analysis and provide insights on the features that contribute the most information to the dataset.
+
+
+### 1. Filter method feature selection
+
+We can use the find Correlation function included in the caret package to create a subset of variabes. 
+
+This function would allows us to remove redundancy by correlation using the given dataset. 
+
+It would search through a correlation matrix and return a vector of integers corresponding to the columns, 
+to remove or reduce pair-wise correlations.
+
+
+## previewing the dataset to be used
+```{r}
+#dataset to be used for feature selection
+#
+feature_df<- pca_sales1
+head(feature_df)
+```
+
+
+### getting the numeric variables 
+```{r}
+#
+#Checking the data types of the columns
+#
+feature_num<- feature_df %>% select_if(is.numeric)
+feature_num
+```
+
+
+
+## dropping "gross.margin.percentage" columns since it had been removed during pca process.
+```{r}
+
+# selecting highly correlated columns to be dropped
+to_drop <- c("gross.margin.percentage")
+#
+#dropping the highly correlated colunms
+#
+feature_num <- feature_num[, !names(feature_num) %in% to_drop]
+head(feature_num)
+
+```
+
+
+### installing packages to be used in feature selection filter method.
+```{r}
+# Installing and loading our caret package
+# ---
+# 
+#        suppressMessages(if
+#                         (!require(caret, quietly=TRUE))
+#               install.packages("caret")))
+library(caret)
+
+```
+
+```{r}
+# Installing and loading the corrplot package for plotting
+# ---
+# 
+#suppressWarnings(
+ #       suppressMessages(if
+  #                       (!require(corrplot, quietly=TRUE))
+  #              install.packages("corrplot")))
+library(corrplot)
+```
+
+
+
+```{r}
+# Calculating the correlation matrix
+# ---
+#
+cor_Matrix <- cor(feature_num)
+cor_Matrix
+
+```
+```{r}
+# Find attributes that are highly correlated
+# ---
+#
+high_cor <- findCorrelation(cor_Matrix, cutoff=0.75)
+high_cor
+#
+names(feature_num[,high_cor])
+```
+observation: Attribute 8,3,4,5, and 9 are highly correlated; they are PC1, Tax, Cogs, gross.income, and PC2. 
+
+we used the PC1 components as engineered features and now we find that they are high correlated features. 
+
+We could compare their correlation with the target variable and then decide on which ones to use for the modeling and which ones not to use. The ones with the highest correlation to the target will be selected for modeling.
+
+
+### Dropping variable with high correlation.
+```{r}
+# We can remove the variables with a higher correlation 
+# and comparing the results graphically as shown below
+# 
+# Removing Redundant Features 
+# ---
+# 
+high_cor2<-feature_num[-high_cor]
+high_cor2
+
+```
+observation:
+
+we now remain with 5 colunms after removing the higly correlated features.
+
+
+###. performing the comparison
+```{r}
+# Performing our graphical comparison
+# ---
+# 
+par(mfrow = c(1, 2))
+corrplot(cor_Matrix, order = "hclust")
+corrplot(cor(high_cor2), order = "hclust")
+```
+observation: Removing all the highly correlated features is not ideal , we could have removed one variable in each correlated pairs if we wanted to build the model. removing one pair in each would reduce Multicollinearity as it remove redundancy. 
+
+The final features that contribute the most information to the dataset are,PC3, Unit.price, Quantity, and total.
+
+
+
+
+### 2. Wrapper Methods feature selection
+
+We use the clustvarsel package that contains an implementation of wrapper methods. 
+
+The clustvarsel function will implement variable section methodology 
+for model-based clustering to find the optimal subset of variables in a dataset.
+
+
+
+### previewing the dataset to be used for this method
+#
+```{r}
+#getting the dataset
+wrapper_df <- df_sales
+#
+#checking the dateset
+#
+head(wrapper_df)
+
+```
+
+## 4.0 chosing numerical variables
+```{r}
+
+# Selecting the numerical data (excluding the categorical variables)
+# ---
+# 
+wrapper_num <- df_sales[,c(6:8,12:16)]
+head(wrapper_num)
+
+```
+
+
+### dropping the colunm
+```{r}
+## dropping "gross.margin.percentage" columns since it leads to zero variance.
+
+# selecting highly correlated columns to be dropped
+to_drop <- c("gross.margin.percentage")
+#
+#dropping the colunm
+#
+wrapper_num <- wrapper_num[, !names(wrapper_num) %in% to_drop]
+head(wrapper_num)
+
+```
+
+
+
+### normalizing the datset.
+```{r}
+# normalizing our dataset by use of scale function.
+#
+library(dplyr)
+wrapper_norm <- as.data.frame(scale(wrapper_num))
+#
+#previewing the scaled dataset.
+head(wrapper_norm)
+```
+observation: our data is now scaled and is now on the same scale.
+
+
+
+### installing the packages to be used
+```{r}
+# Installing and loading our clustvarsel package
+# ---
+# 
+#install.packages("clustvarsel") 
+                         
+library(clustvarsel)
+```
+
+```{r}
+# Installing and loading our mclust package
+# ---
+# 
+#suppressWarnings(
+  #      suppressMessages(if
+  #                       (!require(mclust, quietly=TRUE))
+   #             install.packages("mclust")))
+library(mclust)
+```
+
+
+
+
+### selecting the best features 
+```{r}
+# Sequential forward greedy search (default)
+# ---
+#
+out = clustvarsel(wrapper_norm, G = 1:7)
+out
+```
+observation: 3 variables were accepted, they include Tax, Quantity, and unit price.
+
+
+
+```{r}
+# The selection algorithm would indicate that the subset 
+# we use for the clustering model is composed of variables Tax, Quantity, and Unit price 
+# and that other variables should be rejected. 
+# Having identified the variables that we use, we proceed to build the clustering model:
+# ---
+#
+
+Subset1 = wrapper_norm[out$subset]
+mod = Mclust(Subset1, G = 1:3)
+summary(mod)
+```
+
+```{r}
+plot(mod,c("classification"))
+```
+observation: this is the distribution of 3 clusters. 
+
+
+### Embedded Methods future selection
+
+We will use the ewkm function from the wskm package.
+
+This is a weighted subspace clustering algorithm that is well suited to very high dimensional data.
+
+
+### installing the package to use
+```{r}
+# We install and load our wskm package
+# ---
+#
+#suppressWarnings(
+ #       suppressMessages(if
+     #                    (!require(wskm, quietly=TRUE))
+     #           install.packages("wskm")))
+library(wskm)
+
+set.seed(6)
+model <- ewkm(wrapper_norm[1:7], 4, lambda=2, maxiter=1000)
+model
+```
+
+```{r}
+# Loading and installing our cluster package
+# ---
+#
+#suppressWarnings(
+       # suppressMessages(if
+                        # (!require(cluster, quietly=TRUE))
+                #install.packages("cluster")))
+library("cluster")
+
+# Cluster Plot against 1st 2 principal components
+# ---
+#
+clusplot(wrapper_norm[1:7], model$cluster, color=TRUE, shade=TRUE,
+         labels=6, lines=1,main='Cluster Analysis for sales dataset')
+```
+
+observation, with 4 clusters, the two components explains 84.6% of the point variability.
+
+
+### calculating weight for each cluster
+
+Weights are calculated for each variable and cluster. 
+
+They are a measure of the relative importance of each variable 
+with regards to the membership of the observations to that cluster. 
+
+The weights are incorporated into the distance function, 
+typically reducing the distance for more important variables.
+
+
+
+```{r}
+# checking the Weights 
+# 
+round(model$weights*100,3)
+```
+observation: 
+
+In cluster 1, cluster3 and cluster4: Tax, Cogs, gross.income, and Total variables have high weight of 25
+
+In cluster 2, Quantity has a high weigh of 1
+
+
+
+
+
+### 4. Feature ranking 
+
+We use the FSelector Package. This is a package containing functions for selecting attributes from a given dataset. 
+
+
+```{r}
+#Feature Ranking
+# 
+# We install and load the required packages
+# ---
+# 
+#install.packages("FSelector")
+#
+library(FSelector)
+```
+
+
+### checking correlation.
+```{r}
+library(caret)
+library(corrplot)
+#
+corrplot(cor(wrapper_norm), type = 'upper', method = 'number', tl.cex = 0.9)
+```
+
+### ranking the features
+```{r}
+# From the FSelector package, we use the correlation coefficient as a unit of valuation. 
+# This would be one of the several algorithms contained 
+# in the FSelector package that can be used rank the variables.
+# ---
+# 
+Scores <- linear.correlation(wrapper_norm)
+Scores
+```
+
+explanation: From the output above, we observe a list containing rows of variables on the left and score on the right.
+
+we will now make decision
+
+
+### our decision will be based on cuttoff k=4
+```{r}
+# In order to make a decision, we define a cutoff.
+# we want to use the top 5 representative variables, 
+# through the use of the cutoff.k function included in the FSelector package. 
+# Alternatively, we could define our cutoff visually 
+# but in cases where there are few variables than in high dimensional datasets.
+# 
+# cutoff.k: The algorithms select a subset from a ranked attributes.
+
+Subset <- cutoff.k(Scores, 4)
+as.data.frame(Subset)
+```
+observation: the top 4 features are Tax,Cogs, gross income and Total.
+
+
+
+### cutoff based on percentage
+```{r}
+# We  set cutoff as a percentage which would indicate 
+# that we would want to work with the percentage of the best variables.
+# ---
+#
+Subset2 <-cutoff.k.percent(Scores, 0.5)
+Subset2
+```
+observation: at 50% we get 3 variables as the best to work with.
+
+
+
+
+
+##using entropy insteady of score for information gain.
+```{r}
+library(shiny)
+
+# Instead of using the scores for the correlation coefficient, 
+# we can use an entropy - based approach as shown below;
+# ---
+#Scores2 <- information.gain(subset1)
+
+# Choosing Variables by cutoffSubset <- cutoff.k(Scores2, 5)
+# ---
+# 
+#Subset3 <- cutoff.k(Scores2, 5)
+#as.data.frame(Subset3)
+
+```
+note: this did not work out despite numerous modification. 
+
+
+
+
+
+
+
+
+

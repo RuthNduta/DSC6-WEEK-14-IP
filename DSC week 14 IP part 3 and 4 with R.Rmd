@@ -1,0 +1,444 @@
+---
+title: "DSC week 14 IP part 3 and 4 with R"
+author: "william"
+date: "23/01/2021"
+output: html_document
+---
+
+Part 3: Association Rules
+
+This section will require that you create association rules that will allow you to identify relationships between variables in the dataset. You are provided with a separate dataset that comprises groups of items that will be associated with others. Just like in the other sections, you will also be required to provide insights for your analysis.
+
+
+
+## installing the package to be used
+```{r}
+#install the required arules library 
+#install.packages("arules")
+#install.packages("data.table")
+
+library(arules)
+library(data.table)
+library(lattice)
+library(ggplot2)
+library(caret)
+#install.packages(c("Rcpp","tidyverse")) # install packages to work with data frame - extends into visualization
+library(tidyverse)
+```
+
+
+
+##2.0 Importing dataset
+
+We will use read.transactions fuction which will load data from comma-separated files 
+and convert them to the class transactions, which is the kind of data that 
+we will require while working with models of association rules
+
+```{r}
+# Dataset Url = http://bit.ly/SupermarketDatasetII
+# Importing our dataset
+# ---
+#
+super_dataset <- read.transactions('http://bit.ly/SupermarketDatasetII',sep = ",")
+
+# Previewing the dataset
+# ---
+#having a look at the dataset dimension, and variables
+dim(super_dataset)
+
+
+```
+observation: our dataset has 1701 records and 119 variables. 
+
+
+### checking data type
+```{r}
+# Verifying the object's class
+# ---
+# This should show us transactions as the type of data that we will need
+# ---
+# 
+class(super_dataset)
+```
+observation: out dataset has transaction data type which is the right one for this case.
+
+
+
+```{r}
+# Previewing our first 5 transactions
+#
+inspect(super_dataset[1:5])
+```
+observation: the above shows the first 5 transactions.
+
+
+### previewing the dataset
+```{r}
+# If we wanted to preview the items that make up our super_dataset dataset,
+# alternatively we can do the following
+# ---
+# 
+items<-as.data.frame(itemLabels(super_dataset))
+colnames(items) <- "Item"
+head(items, 10) 
+```
+
+observation: the above shows the ten items that make up our dataset. 
+
+
+### checking the dataset summary
+```{r}
+# Generating a summary of the super-dataset dataset
+# ---
+# This would give us some information such as the most purchased items, 
+# distribution of the item sets (no. of items purchased in each transaction), etc.
+# ---
+# 
+summary(super_dataset)
+```
+this is a concise summary of our dataset. it gives us the most frequent items, which includes mineral water, eggs, spaghetti, french fries, and chocolates.
+
+It also gives us the minimum, median,mean and maximum values in our dataset.
+
+
+### checking the items frequency
+```{r}
+# Exploring the frequency of some articles 
+# of transactions ranging from 1 to 5 and performing 
+# some operation in percentage terms of the total transactions 
+# 
+itemFrequency(super_dataset[, 1:5],type = "absolute")
+round(itemFrequency(super_dataset[, 1:5],type = "relative")*100,2)
+```
+observation: we can avocado has the highest stock of 250 whic is 3.33% of the total transaction, followed by almond at 153 which is 2.04% of the total transaction, and so on.
+
+
+### visualization
+```{r}
+# Producing a chart of frequencies and filtering 
+# to consider only items with a minimum percentage 
+# of support/ considering a top x of items
+# ---
+# Displaying top 10 most common items in the transactions dataset 
+# and the items whose relative importance is at least 10%
+# 
+par(mfrow = c(1, 2))
+
+# plot the frequency of items
+itemFrequencyPlot(super_dataset, topN = 10,col="darkgreen")
+itemFrequencyPlot(super_dataset, support = 0.1,col="darkred")
+```
+observation:
+
+The most common items ara mineral water, eggs, spaghetti, french fries, chocolate, green tea, milk, ground beef, frozen vegetable and pancakes.
+
+The left plot shows items whose relative importance is at least 10%, they include chocolates, eggs, french fries, green tea, milk, mineral water and spaghetti.
+
+
+
+### Building the model using association rules and apriori function
+```{r}
+# Building a model based on association rules 
+# using the apriori function 
+# ---
+# We use Min Support as 0.001 and confidence as 0.8
+# ---
+# 
+rules1 <- apriori (super_dataset, parameter = list(supp = 0.001, conf = 0.8))
+rules1
+
+```
+
+observation, we build the model using association rules and apriori() function, min support=0.001, confidence=0.8
+
+we got 74 rules with this conditions.
+
+However, in order to illustrate the sensitivity of the model to these two parameters, 
+we will increase the support or lower the confidence level and see the result.
+
+
+
+### increasing the support and lowering the confidence level
+```{r}
+# Building a apriori model with Min Support as 0.002 and confidence as 0.8.
+rules2 <- apriori (super_dataset,parameter = list(supp = 0.002, conf = 0.8)) 
+
+# Building apriori model with Min Support as 0.002 and confidence as 0.6.
+rules3 <- apriori (super_dataset, parameter = list(supp = 0.001, conf = 0.6)) 
+
+rules2
+
+rules3
+```
+
+In rule 2, we increased the minimum support of 0.001 to 0.002 and model rules went from 72 to only 2. This would lead us to understand that using a high level of support can make the model lose interesting rules. 
+
+In rule 3, we decreased the minimum confidence level to 0.6 and the number of model rules went from 72 to 545. This would mean that using a low confidence level increases the number of rules to quite an extent and many will not be useful.
+
+
+### performing exploration of the model using summary function
+```{r}
+# We can perform an exploration of our model 
+# through the use of the summary function as shown
+# ---
+# Upon running the code, the function would give us information about the model 
+# i.e. the size of rules, depending on the items that contain these rules. 
+# In our above case, most rules have 3 and 4 items though some rules do have upto 6. 
+# More statistical information such as support, lift and confidence is also provided.
+# ---
+# 
+summary(rules1)
+```
+observation: we are able to see the min, max, median, mean, and max of the rule 1 as well as rule length.
+
+
+###checking the first 5 rules 
+```{r}
+# Observing rules built in our model i.e. first 5 model rules
+# ---
+# 
+inspect(rules1[1:5])
+
+```
+observation:
+
+ If someone buys frozen smoothie and spinach, they are 88% likely to buy mineral water too.
+ 
+ If someone buys bacon and pancake, they are 81% likely to buy spaghetti too.
+ 
+ If someone buys mushroom cream sauce, and pasta, they are 95% likely to buy escalope too etc.
+  
+
+
+### ordering these rules by criteria
+```{r}
+# Ordering these rules by a criteria such as the level of confidence
+# then looking at the first five rules.
+# We can also use different criteria such as: (by = "lift" or by = "support")
+# 
+rules1<-sort(rules1, by="confidence", decreasing=TRUE)
+inspect(rules1[1:5])
+
+```
+Interpretation:
+
+The given five rules have a confidence of 100, this means
+
+ If someone buys rice, and sugar, they are 100% likely to buy whole milk too.
+ 
+ If someone buys canned fish, and hygiene articles, they are 100% likely to buy whole milk too.
+ 
+
+###. visualizing rules1
+```{r}
+library(arulesViz)
+plot(rules1,method = "graph",)
+```
+
+The above shows the top 72 rules ordered by support
+
+
+### making promotion
+```{r}
+# If we're interested in making a promotion relating to the sale of spaghetti, 
+# we could create a subset of rules concerning these products 
+# ---
+# This would tell us the items that the customers bought before purchasing spaghetti
+# ---
+# 
+spaghetti<- subset(rules1, subset = rhs %pin% "spaghetti")
+ 
+# Then order by confidence
+spaghetti<-sort(spaghetti, by="confidence", decreasing=TRUE)
+
+inspect(spaghetti[1:5])
+
+```
+explanation:
+
+these are the items that will be bought before buying spaghetti.
+
+
+
+###. checking the top 5 items that will be bought before buying spagetti
+
+```{r}
+# What if we wanted to determine items that customers might buy 
+# who have previously bought yogurt?
+# ---
+# 
+# Subset the rules
+spaghttie <- subset(rules1, subset = lhs %pin% "spaghetti")
+
+# Order by confidence
+spaghetti<-sort(spaghetti, by="confidence", decreasing=TRUE)
+
+```
+
+```{r}
+# inspect top 5
+inspect(spaghetti[1:5])
+```
+explanation:
+
+the customer is likely to buy these top 5 items  before he can buy spaghetti.
+
+
+```{r}
+plot(spaghetti,method = "graph",)
+```
+The above shows the top 10 rules ordered by support; it shows the items that are liked to be bought along with spaghetti. 
+
+
+## checking the optimal combinations
+
+### installing the package to be used
+```{r}
+library("devtools")
+#install_github("mhahsler/arulesViz")1
+library(arulesViz)
+```
+
+
+### using apriopi function to build the rules
+```{r}
+##using apriori function to build the rules
+r<- apriori (super_dataset, parameter = list(supp = 0.001, conf = 0.9, minlen=4))
+
+```
+
+
+### getting the summary
+```{r}
+summary(r)
+```
+the above shows the summary of our dataset r
+
+
+### visualizing the rules
+```{r}
+# Visualising our rules
+plot(r,method = "scatterplot",jitter=0)
+```
+observation: From the visualization we can conclude that our rules have a good lift , confidence and support.
+
+
+### ploting the graph
+```{r}
+plot(r,method = "graph",)
+```
+The above shows the top 100 rules ordered by support and the items  can be bought together.
+
+
+
+### Part 4: Anomaly Detection
+
+You have also been requested to check whether there are any anomalies in the given sales dataset. The objective of this task being fraud detection.
+
+
+```{r}
+# Dataset Url = http://bit.ly/CarreFourSalesDataset
+# Importing our dataset
+# ---
+#
+carrefour_dataset <- read.csv('http://bit.ly/CarreFourSalesDataset')
+
+# Previewing the dataset
+# ---
+#having a look at the dataset dimension, and variables
+dim(carrefour_dataset)
+head(carrefour_dataset)
+
+
+```
+observation: the dataset has 1000 records and 2 variables. 
+
+
+### installing necessary packages
+
+```{r}
+# Install Lubridate package for date time data
+#install.packages('lubridate')
+library(lubridate)
+```
+
+
+```{r}
+# Installing anomalize package
+#
+#install.packages("anomalize")
+#
+# Load tidyverse and anomalize 
+library(tidyverse)
+library(anomalize)
+```
+
+
+### changing date to date time data
+```{r}
+#changing date to date time. 
+carrefour_dataset$Date <- as.Date(carrefour_dataset$Date, "%m/%d/%y")
+head(carrefour_dataset)
+```
+
+
+### Detecting our anomalies
+
+
+
+### checking  the number of transaction in a day
+
+```{r}
+# group and tally the number of transactions per day
+carrefour_df <- carrefour_dataset %>% group_by(Date) %>% tally()
+colnames(carrefour_df) <- c('transactionDate', 'totalCount')
+head(carrefour_df)
+```
+the above shows the number of the customer transactions frm Jan 1st to Jan 6th. 
+
+
+### checking for anomalies and ploting them
+```{r}
+# anomalize() - 
+# We perform anomaly detection on the decomposed data using 
+# the remainder column through the use of the anomalize() function 
+# which procides 3 new columns; âremainder_l1â (lower limit), 
+# âremainder_l2â (upper limit), and âanomalyâ (Yes/No Flag).
+# The default method is method = "iqr", which is fast and relatively 
+# accurate at detecting anomalies. 
+# The alpha parameter is by default set to alpha = 0.05, 
+# but can be adjusted to increase or decrease the height of the anomaly bands, 
+# making it more difficult or less difficult for data to be anomalous. 
+# The max_anoms parameter is by default set to a maximum of max_anoms = 0.2 
+# for 20% of data that can be anomalous. 
+# 
+```
+
+
+## ploting to visualize the anormaly
+```{r}
+# we now plot using plot_anomaly_decomposition() to visualize out data.
+carrefour_df %>%
+    time_decompose(totalCount) %>%
+    anomalize(remainder) %>%
+    plot_anomaly_decomposition(ncol = 2, alpha_dots = 0.5) +
+    ggtitle("Anomaly Detection Plot")
+```
+observation: there is no red flag thus these customer transactions do not have anomalies.
+
+
+
+### plotting recomposition to check anomalies further
+```{r}
+# ploting the recomposition to try and see anomalies
+#
+carrefour_df %>%
+    time_decompose(totalCount) %>%
+    anomalize(remainder) %>%
+    time_recompose() %>%
+    plot_anomalies(time_recomposed = TRUE, ncol = 4, alpha_dots = 0.25, fill="dark red") +
+    ggtitle("Anomalie detection plots")
+
+```
+
+observation: we can conclude that there is no anomaly(outliers) in this dataset.
